@@ -677,7 +677,7 @@ class EventClientSerializer:
         """
         # To handle the case of presence events and the like
         if not isinstance(event, FilteredEvent):
-            raise TypeError("Expected EventBase or Event, got %r" % (event,))
+            return event
 
         # Force-enable server admin metadata because the only time an event with
         # relevant metadata will be when the admin requested it via their admin
