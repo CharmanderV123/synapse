@@ -39,12 +39,9 @@ use pythonize::{depythonize, pythonize};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    events::{
-        constants::{get_room_version_py, RoomVersion},
-        internal_metadata::EventInternalMetadata,
-        utils::calculate_event_id,
-    },
+    events::{internal_metadata::EventInternalMetadata, utils::calculate_event_id},
     identifier::EventID,
+    room_versions::{EventFormatVersions, RoomVersion},
 };
 
 mod constants;
@@ -634,19 +631,16 @@ impl Event {
         let rejected_reason = rejected_reason.map(String::into_boxed_str);
 
         // Check we're the right room version
-        match room_version {
-            RoomVersion::V4
-            | RoomVersion::V5
-            | RoomVersion::V6
-            | RoomVersion::V7
-            | RoomVersion::V8
-            | RoomVersion::V9
-            | RoomVersion::V10
-            | RoomVersion::V11
-            | RoomVersion::OrgMatrixMsc1767_10
-            | RoomVersion::OrgMatrixMsc3757_10
-            | RoomVersion::OrgMatrixMsc3757_11 => {}
-            _ => return Err(PyValueError::new_err("Unsupported room version")),
+        if ![
+            EventFormatVersions::ROOM_V3,
+            EventFormatVersions::ROOM_V4_PLUS,
+        ]
+        .contains(&room_version.event_format)
+        {
+            return Err(PyValueError::new_err(format!(
+                "Unsupported room version: {}",
+                room_version
+            )));
         }
 
         let event_format_v3: EventFormatV3Container = depythonize(event_dict)?;
@@ -797,8 +791,8 @@ impl Event {
     }
 
     #[getter]
-    fn room_version<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        get_room_version_py(&self.room_version, py)
+    fn room_version(&self) -> RoomVersion {
+        self.room_version
     }
 
     fn prev_event_ids(&self) -> PyResult<Vec<String>> {
@@ -833,46 +827,28 @@ impl Event {
 
     #[getter]
     fn redacts<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        let value = match self.room_version {
-            RoomVersion::V1
-            | RoomVersion::V2
-            | RoomVersion::V3
-            | RoomVersion::V4
-            | RoomVersion::V5
-            | RoomVersion::V6
-            | RoomVersion::V7
-            | RoomVersion::V8
-            | RoomVersion::V9
-            | RoomVersion::V10 => {
-                let other_fields = match &self.inner {
-                    EventFormatEnum::V3(format) => &format.common_fields.other_fields,
-                    // ...
-                };
+        let value = if !self.room_version.updated_redaction_rules {
+            let other_fields = match &self.inner {
+                EventFormatEnum::V3(format) => &format.common_fields.other_fields,
+                // ...
+            };
 
-                let Some(value) = other_fields.get("redacts") else {
-                    return Ok(None);
-                };
+            let Some(value) = other_fields.get("redacts") else {
+                return Ok(None);
+            };
 
-                value
-            }
-            RoomVersion::V11
-            | RoomVersion::V12
-            | RoomVersion::OrgMatrixMsc1767_10
-            | RoomVersion::OrgMatrixMsc3757_10
-            | RoomVersion::OrgMatrixMsc3757_11
-            | RoomVersion::OrgMatrixHydra11 => {
-                let content = match &self.inner {
-                    EventFormatEnum::V3(format) => &format.common_fields.content,
-                    // ...
-                };
+            value
+        } else {
+            let content = match &self.inner {
+                EventFormatEnum::V3(format) => &format.common_fields.content,
+                // ...
+            };
 
-                let Some(value) = content.object.get("redacts") else {
-                    return Ok(None);
-                };
+            let Some(value) = content.object.get("redacts") else {
+                return Ok(None);
+            };
 
-                value
-            }
-            RoomVersion::Custom(_) => todo!(),
+            value
         };
 
         Ok(Some(pythonize(py, value)?))

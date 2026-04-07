@@ -14,7 +14,11 @@
 
 //! Rust implementation of room version definitions.
 
-use std::sync::{Arc, LazyLock, RwLock};
+use std::{
+    fmt::Display,
+    str::FromStr,
+    sync::{Arc, LazyLock, RwLock},
+};
 
 use pyo3::{
     exceptions::{PyKeyError, PyRuntimeError},
@@ -37,16 +41,16 @@ pub struct EventFormatVersions {}
 impl EventFormatVersions {
     /// $id:server event id format: used for room v1 and v2
     #[classattr]
-    const ROOM_V1_V2: i32 = 1;
+    pub const ROOM_V1_V2: i32 = 1;
     /// MSC1659-style $hash event id format: used for room v3
     #[classattr]
-    const ROOM_V3: i32 = 2;
+    pub const ROOM_V3: i32 = 2;
     /// MSC1884-style $hash format: introduced for room v4
     #[classattr]
-    const ROOM_V4_PLUS: i32 = 3;
+    pub const ROOM_V4_PLUS: i32 = 3;
     /// MSC4291 room IDs as hashes: introduced for room HydraV11
     #[classattr]
-    const ROOM_V11_HYDRA_PLUS: i32 = 4;
+    pub const ROOM_V11_HYDRA_PLUS: i32 = 4;
 }
 
 /// Enum to identify the state resolution algorithms.
@@ -57,13 +61,13 @@ pub struct StateResolutionVersions {}
 impl StateResolutionVersions {
     /// Room v1 state res
     #[classattr]
-    const V1: i32 = 1;
+    pub const V1: i32 = 1;
     /// MSC1442 state res: room v2 and later
     #[classattr]
-    const V2: i32 = 2;
+    pub const V2: i32 = 2;
     /// MSC4297 state res
     #[classattr]
-    const V2_1: i32 = 3;
+    pub const V2_1: i32 = 3;
 }
 
 /// Room disposition constants.
@@ -146,6 +150,59 @@ pub struct RoomVersion {
     ///
     /// In these room versions, we are stricter with event size validation.
     pub strict_event_byte_limits_room_versions: bool,
+}
+
+impl RoomVersion {
+    pub const V1: RoomVersion = ROOM_VERSION_V1;
+    pub const V2: RoomVersion = ROOM_VERSION_V2;
+    pub const V3: RoomVersion = ROOM_VERSION_V3;
+    pub const V4: RoomVersion = ROOM_VERSION_V4;
+    pub const V5: RoomVersion = ROOM_VERSION_V5;
+    pub const V6: RoomVersion = ROOM_VERSION_V6;
+    pub const V7: RoomVersion = ROOM_VERSION_V7;
+    pub const V8: RoomVersion = ROOM_VERSION_V8;
+    pub const V9: RoomVersion = ROOM_VERSION_V9;
+    pub const V10: RoomVersion = ROOM_VERSION_V10;
+    pub const MSC1767V10: RoomVersion = ROOM_VERSION_MSC1767V10;
+    pub const MSC3389V10: RoomVersion = ROOM_VERSION_MSC3389V10;
+    pub const MSC3757V10: RoomVersion = ROOM_VERSION_MSC3757V10;
+    pub const V11: RoomVersion = ROOM_VERSION_V11;
+    pub const MSC3757V11: RoomVersion = ROOM_VERSION_MSC3757V11;
+    pub const HYDRA_V11: RoomVersion = ROOM_VERSION_HYDRA_V11;
+    pub const V12: RoomVersion = ROOM_VERSION_V12;
+}
+
+impl Display for RoomVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.identifier.fmt(f)
+    }
+}
+
+impl FromStr for RoomVersion {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "1" => Ok(Self::V1),
+            "2" => Ok(Self::V2),
+            "3" => Ok(Self::V3),
+            "4" => Ok(Self::V4),
+            "5" => Ok(Self::V5),
+            "6" => Ok(Self::V6),
+            "7" => Ok(Self::V7),
+            "8" => Ok(Self::V8),
+            "9" => Ok(Self::V9),
+            "10" => Ok(Self::V10),
+            "11" => Ok(Self::V11),
+            "12" => Ok(Self::V12),
+            "org.matrix.msc1767.10" => Ok(Self::MSC1767V10),
+            "org.matrix.msc3389.10" => Ok(Self::MSC3389V10),
+            "org.matrix.msc3757.10" => Ok(Self::MSC3757V10),
+            "org.matrix.msc3757.11" => Ok(Self::MSC3757V11),
+            "org.matrix.hydra.11" => Ok(Self::HYDRA_V11),
+            _ => Err(anyhow::anyhow!("Unknown room version: {}", s)),
+        }
+    }
 }
 
 const ROOM_VERSION_V1: RoomVersion = RoomVersion {
@@ -727,78 +784,78 @@ static KNOWN_ROOM_VERSIONS: LazyLock<KnownRoomVersionsMapping> = LazyLock::new(|
 ///
 /// This should contain all room versions that we know about.
 #[pyclass(frozen)]
-pub struct RoomVersions {}
+struct RoomVersions {}
 
 #[pymethods]
 #[allow(non_snake_case)]
 impl RoomVersions {
     #[classattr]
     fn V1(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V1.into_py_any(py)
+        RoomVersion::V1.into_py_any(py)
     }
     #[classattr]
     fn V2(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V2.into_py_any(py)
+        RoomVersion::V2.into_py_any(py)
     }
     #[classattr]
     fn V3(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V3.into_py_any(py)
+        RoomVersion::V3.into_py_any(py)
     }
     #[classattr]
     fn V4(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V4.into_py_any(py)
+        RoomVersion::V4.into_py_any(py)
     }
     #[classattr]
     fn V5(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V5.into_py_any(py)
+        RoomVersion::V5.into_py_any(py)
     }
     #[classattr]
     fn V6(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V6.into_py_any(py)
+        RoomVersion::V6.into_py_any(py)
     }
     #[classattr]
     fn V7(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V7.into_py_any(py)
+        RoomVersion::V7.into_py_any(py)
     }
     #[classattr]
     fn V8(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V8.into_py_any(py)
+        RoomVersion::V8.into_py_any(py)
     }
     #[classattr]
     fn V9(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V9.into_py_any(py)
+        RoomVersion::V9.into_py_any(py)
     }
     #[classattr]
     fn V10(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V10.into_py_any(py)
+        RoomVersion::V10.into_py_any(py)
     }
     #[classattr]
     fn MSC1767v10(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_MSC1767V10.into_py_any(py)
+        RoomVersion::MSC1767V10.into_py_any(py)
     }
     #[classattr]
     fn MSC3389v10(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_MSC3389V10.into_py_any(py)
+        RoomVersion::MSC3389V10.into_py_any(py)
     }
     #[classattr]
     fn MSC3757v10(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_MSC3757V10.into_py_any(py)
+        RoomVersion::MSC3757V10.into_py_any(py)
     }
     #[classattr]
     fn V11(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V11.into_py_any(py)
+        RoomVersion::V11.into_py_any(py)
     }
     #[classattr]
     fn MSC3757v11(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_MSC3757V11.into_py_any(py)
+        RoomVersion::MSC3757V11.into_py_any(py)
     }
     #[classattr]
     fn HydraV11(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_HYDRA_V11.into_py_any(py)
+        RoomVersion::HYDRA_V11.into_py_any(py)
     }
     #[classattr]
     fn V12(py: Python<'_>) -> PyResult<Py<PyAny>> {
-        ROOM_VERSION_V12.into_py_any(py)
+        RoomVersion::V12.into_py_any(py)
     }
 }
 

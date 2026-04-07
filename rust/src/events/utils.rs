@@ -22,16 +22,19 @@ use super::constants::{
         M_ROOM_POWER_LEVELS, M_ROOM_REDACTION,
     },
     history_visibility_field, join_rules_field, membership_field, power_levels_field,
-    redaction_field, RoomVersion, MAX_PDU_SIZE_BYTES,
+    redaction_field, MAX_PDU_SIZE_BYTES,
 };
-use crate::identifier::{EventID, IdentifierError};
+use crate::{
+    identifier::{EventID, IdentifierError},
+    room_versions::{EventFormatVersions, RoomVersion},
+};
 
 /// Calculates the event_id of an event.
 ///
 /// The event_id is the `reference_hash` of the redacted event json, preceded by a `$`.
 /// `calculate_event_id` can be used to determine the `event_id` for events in room versions V3+.
 pub fn calculate_event_id(event: &Value, room_version: &RoomVersion) -> anyhow::Result<EventID> {
-    if matches!(room_version, RoomVersion::V1 | RoomVersion::V2) {
+    if room_version.event_format == EventFormatVersions::ROOM_V1_V2 {
         anyhow::bail!(
             "Attempted to calculate event_id using reference hash for room version v1/v2"
         );
@@ -60,12 +63,12 @@ fn compute_event_reference_hash(
     redacted_value_mut.remove(SIGNATURES);
     redacted_value_mut.remove(UNSIGNED);
 
-    let canonicalization_options = match room_version {
-        RoomVersion::V1 | RoomVersion::V2 | RoomVersion::V3 | RoomVersion::V4 | RoomVersion::V5 => {
-            CanonicalizationOptions::relaxed()
-        }
-        _ => CanonicalizationOptions::strict(),
+    let canonicalization_options = if room_version.strict_canonicaljson {
+        CanonicalizationOptions::strict()
+    } else {
+        CanonicalizationOptions::relaxed()
     };
+
     let json = signed_json::to_string_canonical(&redacted_value_mut, canonicalization_options)
         .map_err(|err| anyhow::anyhow!(err))?;
     if json.len() > MAX_PDU_SIZE_BYTES {
@@ -74,7 +77,7 @@ fn compute_event_reference_hash(
 
     let hash = Sha256::digest(json.as_bytes());
 
-    let base64_alphabet = if *room_version == RoomVersion::V3 {
+    let base64_alphabet = if room_version.event_format == EventFormatVersions::ROOM_V3 {
         base64::alphabet::STANDARD
     } else {
         base64::alphabet::URL_SAFE
@@ -266,22 +269,8 @@ pub fn redact_internal(event: &Value, room_version: &RoomVersion) -> anyhow::Res
 ///
 /// Added in room version 11.
 /// <https://spec.matrix.org/v1.16/rooms/v11/#redactions>
-pub fn use_updated_redaction_rules(room_version_id: &RoomVersion) -> bool {
-    !matches!(
-        room_version_id,
-        RoomVersion::V1
-            | RoomVersion::V2
-            | RoomVersion::V3
-            | RoomVersion::V4
-            | RoomVersion::V5
-            | RoomVersion::V6
-            | RoomVersion::V7
-            | RoomVersion::V8
-            | RoomVersion::V9
-            | RoomVersion::V10
-            | RoomVersion::OrgMatrixMsc1767_10
-            | RoomVersion::OrgMatrixMsc3757_10
-    )
+pub fn use_updated_redaction_rules(room_version: &RoomVersion) -> bool {
+    room_version.updated_redaction_rules
 }
 
 /// Whether `m.room.aliases` has significant meaning.
@@ -291,10 +280,7 @@ pub fn use_updated_redaction_rules(room_version_id: &RoomVersion) -> bool {
 /// Removed in room version 6.
 /// <https://spec.matrix.org/v1.16/rooms/v6/#redactions>
 fn use_special_case_aliases_auth(room_version_id: &RoomVersion) -> bool {
-    matches!(
-        room_version_id,
-        RoomVersion::V1 | RoomVersion::V2 | RoomVersion::V3 | RoomVersion::V4 | RoomVersion::V5
-    )
+    room_version_id.special_case_aliases_auth
 }
 
 /// `m.room.join_rules` events now keep `allow` in addition to other keys in `content` when being
@@ -303,16 +289,7 @@ fn use_special_case_aliases_auth(room_version_id: &RoomVersion) -> bool {
 /// Added in room version 8.
 /// <https://spec.matrix.org/v1.16/rooms/v8/#redactions>
 fn use_restricted_join_rule(room_version_id: &RoomVersion) -> bool {
-    !matches!(
-        room_version_id,
-        RoomVersion::V1
-            | RoomVersion::V2
-            | RoomVersion::V3
-            | RoomVersion::V4
-            | RoomVersion::V5
-            | RoomVersion::V6
-            | RoomVersion::V7
-    )
+    room_version_id.restricted_join_rule
 }
 
 /// `m.room.member` events now keep `join_authorised_via_users_server` in addition to other keys in
@@ -321,17 +298,7 @@ fn use_restricted_join_rule(room_version_id: &RoomVersion) -> bool {
 /// Added in room version 9.
 /// <https://spec.matrix.org/v1.16/rooms/v9/#redactions>
 fn use_restricted_join_rule_fix(room_version_id: &RoomVersion) -> bool {
-    !matches!(
-        room_version_id,
-        RoomVersion::V1
-            | RoomVersion::V2
-            | RoomVersion::V3
-            | RoomVersion::V4
-            | RoomVersion::V5
-            | RoomVersion::V6
-            | RoomVersion::V7
-            | RoomVersion::V8
-    )
+    room_version_id.restricted_join_rule_fix
 }
 
 /// The content of a `m.room.create` event no longer has a `creator` property, which previously was
@@ -340,21 +307,7 @@ fn use_restricted_join_rule_fix(room_version_id: &RoomVersion) -> bool {
 /// Added in room version 11.
 /// <https://spec.matrix.org/v1.16/rooms/v11/#redactions>
 fn use_implicit_room_creator(room_version_id: &RoomVersion) -> bool {
-    !matches!(
-        room_version_id,
-        RoomVersion::V1
-            | RoomVersion::V2
-            | RoomVersion::V3
-            | RoomVersion::V4
-            | RoomVersion::V5
-            | RoomVersion::V6
-            | RoomVersion::V7
-            | RoomVersion::V8
-            | RoomVersion::V9
-            | RoomVersion::V10
-            | RoomVersion::OrgMatrixMsc1767_10
-            | RoomVersion::OrgMatrixMsc3757_10
-    )
+    room_version_id.implicit_room_creator
 }
 
 /// Whether room ids are hashes, or still the older localpart:domain style.
@@ -363,23 +316,7 @@ fn use_implicit_room_creator(room_version_id: &RoomVersion) -> bool {
 /// Added in room version 12.
 /// <https://spec.matrix.org/v1.16/rooms/v12/#redactions>
 pub fn use_room_ids_as_hashes(room_version_id: &RoomVersion) -> bool {
-    !matches!(
-        room_version_id,
-        RoomVersion::V1
-            | RoomVersion::V2
-            | RoomVersion::V3
-            | RoomVersion::V4
-            | RoomVersion::V5
-            | RoomVersion::V6
-            | RoomVersion::V7
-            | RoomVersion::V8
-            | RoomVersion::V9
-            | RoomVersion::V10
-            | RoomVersion::V11
-            | RoomVersion::OrgMatrixMsc1767_10
-            | RoomVersion::OrgMatrixMsc3757_10
-            | RoomVersion::OrgMatrixMsc3757_11
-    )
+    room_version_id.msc4291_room_ids_as_hashes
 }
 
 #[cfg(test)]
@@ -387,8 +324,7 @@ mod tests {
     use serde_json::json;
 
     use super::{calculate_event_id, redact, redact_internal};
-    use crate::events::constants::RoomVersion;
-    use crate::identifier::EventID;
+    use crate::{identifier::EventID, room_versions::RoomVersion};
 
     #[test]
     fn test_calculate_event_id() {
@@ -1030,7 +966,7 @@ mod tests {
         let redacted = redact(&original, &RoomVersion::V11).unwrap();
         assert_eq!(expected_implicit_room_creator, redacted);
 
-        let versions = [RoomVersion::OrgMatrixHydra11, RoomVersion::V12];
+        let versions = [RoomVersion::HYDRA_V11, RoomVersion::V12];
         for version in versions {
             let redacted = redact(&original, &version).unwrap();
             assert_eq!(
