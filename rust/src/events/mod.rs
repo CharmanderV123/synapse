@@ -21,6 +21,7 @@
 //! Classes for representing Events.
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     str::FromStr,
     sync::{Arc, RwLock},
@@ -595,8 +596,6 @@ struct EventCommonFields {
     type_: Box<str>,
     signatures: Signatures,
 
-    room_id: Option<Box<str>>,
-
     #[serde(default)]
     unsigned: JsonObjectMutable,
 
@@ -616,7 +615,7 @@ struct Event {
 #[pymethods]
 impl Event {
     #[new]
-    fn new<'a, 'py>(
+    fn new_from_py<'a, 'py>(
         py: Python<'py>,
         event_dict: &'a Bound<'py, PyAny>,
         room_version: &'a Bound<'py, PyAny>,
@@ -648,7 +647,7 @@ impl Event {
 
         let event_format_v3_v4_plus: EventFormatV3V4Container = depythonize(event_dict)?;
 
-        event_format_v3_v4_plus.check_valid(room_version)?;
+        event_format_v3_v4_plus.validate(room_version)?;
 
         let internal_metadata = Py::new(py, EventInternalMetadata::new(internal_metadata_dict)?)?;
 
@@ -701,10 +700,9 @@ impl Event {
     }
 
     #[getter]
-    fn room_id(&self) -> Option<&str> {
+    fn room_id(&self) -> PyResult<Cow<'_, str>> {
         match &self.inner {
-            EventFormatEnum::V3V4Plus(format) => format.common_fields.room_id.as_deref(),
-            // ...
+            EventFormatEnum::V3V4Plus(format) => Ok(format.room_id(&self.event_id)?),
         }
     }
 
@@ -923,6 +921,7 @@ enum EventFormatEnum {
 struct EventFormatV3V4Plus {
     auth_events: Vec<String>,
     prev_events: Vec<String>,
+    room_id: Option<Box<str>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -934,8 +933,28 @@ struct EventFormatV3V4Container {
 }
 
 impl EventFormatV3V4Container {
-    fn check_valid(&self, room_version: &RoomVersion) -> Result<(), Error> {
-        if self.common_fields.room_id.is_none() {
+    fn room_id(&self, event_id: &EventID) -> Result<Cow<'_, str>, Error> {
+        if let Some(room_id) = self.specific_fields.room_id.as_deref() {
+            return Ok(room_id.into());
+        }
+
+        // Ensure that this is a create event, as all other events must
+        // have a room ID.
+        if &*self.common_fields.type_ != "m.room.create" {
+            bail!("Event '{event_id}' has no room ID");
+        }
+
+        // The room ID is derived from the event ID by replacing the
+        // leading '$' with a '!'.
+        let mut room_id = String::with_capacity(event_id.len());
+        room_id.push('!');
+        room_id.push_str(&event_id[1..]);
+
+        Ok(room_id.into())
+    }
+
+    fn validate(&self, room_version: &RoomVersion) -> Result<(), Error> {
+        if self.specific_fields.room_id.is_none() {
             // Only create events in event formats v4 plus can have a missing room_id.
             if room_version.event_format != EventFormatVersions::ROOM_V4_PLUS {
                 bail!("room_id is required for event formats v3 and below");
@@ -953,6 +972,8 @@ impl EventFormatV3V4Container {
 
 #[cfg(test)]
 mod tests {
+    use signed_json::json;
+
     use super::*;
 
     #[test]
@@ -966,7 +987,7 @@ mod tests {
         assert_eq!(&*event.common_fields.type_, "m.room.create");
 
         assert_eq!(
-            event.common_fields.room_id.as_deref(),
+            event.specific_fields.room_id.as_deref(),
             Some("!qVoJSympOqdUQRUfiC:localhost:8800")
         );
 
@@ -994,6 +1015,21 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&serialized_json).unwrap(),
             serde_json::from_str::<serde_json::Value>(json).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_room_id_for_create_event() {
+        let json = r#"{"auth_events":[],"prev_events":[],"type":"m.room.create","sender":"@erikj:jki.re","content":{"room_version":"12","predecessor":{"room_id":"!VuNGkDTdbMOOxSmuDa:jki.re"}},"depth":1,"state_key":"","origin_server_ts":1775568141481,"hashes":{"sha256":"qBX+glsKvogXFrvsEN0eh13pO2kpuE6o/b4yREPtOqw"},"signatures":{"jki.re":{"ed25519:auto":"n/4gHQRagk3r1r24L/7a+oaMMf9cysVfQRYdjpDZcf4ppkVym33rhTW18Vy4zMa1L5nsWLkxsBvbrRRDYUOhBQ"}},"unsigned":{"age_ts":1775568141481}}"#;
+        let event_value: serde_json::Value = serde_json::from_str(json).unwrap();
+
+        let event: EventFormatV3V4Container = serde_json::from_str(json).unwrap();
+
+        let event_id = calculate_event_id(&event_value, &RoomVersion::V12).unwrap();
+
+        assert_eq!(
+            &*event.room_id(&event_id).unwrap(),
+            "!BeXKh925K_M46DwsuJFR0EyBpE1P7CFUDGuWW4xw55Y"
         );
     }
 }

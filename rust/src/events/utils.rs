@@ -112,7 +112,7 @@ pub fn redact(event: &Value, room_version: &RoomVersion) -> anyhow::Result<Value
     ]);
 
     // Earlier room versions had additional allowed keys
-    if !use_updated_redaction_rules(room_version) {
+    if !room_version.updated_redaction_rules {
         allowed_keys.extend([(PREV_STATE, ()), (MEMBERSHIP, ()), (ORIGIN, ())]);
     }
 
@@ -140,10 +140,10 @@ pub fn redact(event: &Value, room_version: &RoomVersion) -> anyhow::Result<Value
     match event_type {
         M_ROOM_MEMBER => {
             add_content_field(membership_field::MEMBERSHIP);
-            if use_restricted_join_rule_fix(room_version) {
+            if room_version.restricted_join_rule_fix {
                 add_content_field(membership_field::JOIN_AUTHORISED_VIA_USERS_SERVER);
             }
-            if use_updated_redaction_rules(room_version) {
+            if room_version.updated_redaction_rules {
                 // Preserve the signed field under third_party_invite.
                 if let Some(third_party_invite) =
                     event_content.get(membership_field::THIRD_PARTY_INVITE)
@@ -163,7 +163,7 @@ pub fn redact(event: &Value, room_version: &RoomVersion) -> anyhow::Result<Value
             }
         }
         M_ROOM_CREATE => {
-            if use_updated_redaction_rules(room_version) {
+            if room_version.updated_redaction_rules {
                 // MSC2176 rules state that create events cannot have their `content` redacted.
                 if let Some(event_content_object) = event_content.as_object() {
                     for (field, _value) in event_content_object {
@@ -171,18 +171,18 @@ pub fn redact(event: &Value, room_version: &RoomVersion) -> anyhow::Result<Value
                     }
                 }
             }
-            if !use_implicit_room_creator(room_version) {
+            if !room_version.implicit_room_creator {
                 // Some room versions give meaning to `creator`
                 add_content_field(create_field::CREATOR);
             }
-            if use_room_ids_as_hashes(room_version) {
+            if room_version.msc4291_room_ids_as_hashes {
                 // room_id is not allowed on the create event as it's derived from the event ID
                 allowed_keys.remove(ROOM_ID);
             }
         }
         M_ROOM_JOIN_RULES => {
             add_content_field(join_rules_field::JOIN_RULE);
-            if use_restricted_join_rule(room_version) {
+            if room_version.restricted_join_rule {
                 add_content_field(join_rules_field::ALLOW);
             }
         }
@@ -195,17 +195,17 @@ pub fn redact(event: &Value, room_version: &RoomVersion) -> anyhow::Result<Value
             add_content_field(power_levels_field::BAN);
             add_content_field(power_levels_field::KICK);
             add_content_field(power_levels_field::REDACT);
-            if use_updated_redaction_rules(room_version) {
+            if room_version.updated_redaction_rules {
                 add_content_field(power_levels_field::INVITE);
             }
         }
-        M_ROOM_ALIASES if use_special_case_aliases_auth(room_version) => {
+        M_ROOM_ALIASES if room_version.special_case_aliases_auth => {
             add_content_field(aliases_field::ALIASES);
         }
         M_ROOM_HISTORY_VISIBILITY => {
             add_content_field(history_visibility_field::HISTORY_VISIBILITY)
         }
-        M_ROOM_REDACTION if use_updated_redaction_rules(room_version) => {
+        M_ROOM_REDACTION if room_version.updated_redaction_rules => {
             add_content_field(redaction_field::REDACTS);
         }
         _ => (),
@@ -259,64 +259,6 @@ pub fn redact_internal(event: &Value, room_version: &RoomVersion) -> anyhow::Res
     redacted_mut.insert(UNSIGNED.to_string(), new_unsigned);
 
     Ok(redacted)
-}
-
-/// Whether the `redacts` field has been moved from the top level to inside `content` for the given
-/// room version. The top-level `origin`, `membership`, and `prev_state` properties are no longer
-/// protected from redaction. The `m.room.create` event now keeps the entire content property. The
-/// `m.room.redaction` event keeps the `redacts` property under `content`. The
-/// `m.room.power_levels` event keeps the `invite` property under `content`.
-///
-/// Added in room version 11.
-/// <https://spec.matrix.org/v1.16/rooms/v11/#redactions>
-pub fn use_updated_redaction_rules(room_version: &RoomVersion) -> bool {
-    room_version.updated_redaction_rules
-}
-
-/// Whether `m.room.aliases` has significant meaning.
-/// This means that the `aliases` property under `content` is no longer kept for the `m.room.aliases`
-/// event type.
-///
-/// Removed in room version 6.
-/// <https://spec.matrix.org/v1.16/rooms/v6/#redactions>
-fn use_special_case_aliases_auth(room_version_id: &RoomVersion) -> bool {
-    room_version_id.special_case_aliases_auth
-}
-
-/// `m.room.join_rules` events now keep `allow` in addition to other keys in `content` when being
-/// redacted.
-///
-/// Added in room version 8.
-/// <https://spec.matrix.org/v1.16/rooms/v8/#redactions>
-fn use_restricted_join_rule(room_version_id: &RoomVersion) -> bool {
-    room_version_id.restricted_join_rule
-}
-
-/// `m.room.member` events now keep `join_authorised_via_users_server` in addition to other keys in
-/// `content` when being redacted.
-///
-/// Added in room version 9.
-/// <https://spec.matrix.org/v1.16/rooms/v9/#redactions>
-fn use_restricted_join_rule_fix(room_version_id: &RoomVersion) -> bool {
-    room_version_id.restricted_join_rule_fix
-}
-
-/// The content of a `m.room.create` event no longer has a `creator` property, which previously was
-/// always equivalent to the `sender` of the event.
-///
-/// Added in room version 11.
-/// <https://spec.matrix.org/v1.16/rooms/v11/#redactions>
-fn use_implicit_room_creator(room_version_id: &RoomVersion) -> bool {
-    room_version_id.implicit_room_creator
-}
-
-/// Whether room ids are hashes, or still the older localpart:domain style.
-/// Returns true if the room_id is a hash for the given room version.
-///
-/// Added in room version 12.
-/// <https://spec.matrix.org/v1.16/rooms/v12/#redactions>
-pub fn use_room_ids_as_hashes(room_version_id: &RoomVersion) -> bool {
-    room_version_id.msc4291_room_ids_as_hashes
 }
 
 #[cfg(test)]
