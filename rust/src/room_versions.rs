@@ -95,7 +95,7 @@ impl PushRuleRoomFlag {
 
 /// An object which describes the unique attributes of a room version.
 #[pyclass(frozen, eq, hash, get_all)]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RoomVersion {
     /// The identifier for this version.
     pub identifier: &'static str,
@@ -178,30 +178,42 @@ impl Display for RoomVersion {
     }
 }
 
-impl FromStr for RoomVersion {
+impl FromStr for &RoomVersion {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "1" => Ok(Self::V1),
-            "2" => Ok(Self::V2),
-            "3" => Ok(Self::V3),
-            "4" => Ok(Self::V4),
-            "5" => Ok(Self::V5),
-            "6" => Ok(Self::V6),
-            "7" => Ok(Self::V7),
-            "8" => Ok(Self::V8),
-            "9" => Ok(Self::V9),
-            "10" => Ok(Self::V10),
-            "11" => Ok(Self::V11),
-            "12" => Ok(Self::V12),
-            "org.matrix.msc1767.10" => Ok(Self::MSC1767V10),
-            "org.matrix.msc3389.10" => Ok(Self::MSC3389V10),
-            "org.matrix.msc3757.10" => Ok(Self::MSC3757V10),
-            "org.matrix.msc3757.11" => Ok(Self::MSC3757V11),
-            "org.matrix.hydra.11" => Ok(Self::HYDRA_V11),
+            "1" => Ok(&RoomVersion::V1),
+            "2" => Ok(&RoomVersion::V2),
+            "3" => Ok(&RoomVersion::V3),
+            "4" => Ok(&RoomVersion::V4),
+            "5" => Ok(&RoomVersion::V5),
+            "6" => Ok(&RoomVersion::V6),
+            "7" => Ok(&RoomVersion::V7),
+            "8" => Ok(&RoomVersion::V8),
+            "9" => Ok(&RoomVersion::V9),
+            "10" => Ok(&RoomVersion::V10),
+            "11" => Ok(&RoomVersion::V11),
+            "12" => Ok(&RoomVersion::V12),
+            "org.matrix.msc1767.10" => Ok(&RoomVersion::MSC1767V10),
+            "org.matrix.msc3389.10" => Ok(&RoomVersion::MSC3389V10),
+            "org.matrix.msc3757.10" => Ok(&RoomVersion::MSC3757V10),
+            "org.matrix.msc3757.11" => Ok(&RoomVersion::MSC3757V11),
+            "org.matrix.hydra.11" => Ok(&RoomVersion::HYDRA_V11),
             _ => Err(anyhow::anyhow!("Unknown room version: {}", s)),
         }
+    }
+}
+
+impl<'py> IntoPyObject<'py> for &RoomVersion {
+    type Target = RoomVersion;
+
+    type Output = Bound<'py, RoomVersion>;
+
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        self.clone().into_pyobject(py)
     }
 }
 
@@ -667,7 +679,7 @@ impl KnownRoomVersionsMapping {
         versions
             .iter()
             .find(|v| v.identifier == key)
-            .copied()
+            .cloned()
             .ok_or_else(|| PyKeyError::new_err(key.to_string()))
     }
 
@@ -699,7 +711,7 @@ impl KnownRoomVersionsMapping {
         // like a Set *and* has a stable ordering). We don't depend on this, so
         // for simplicity we just return a list of the items.
         let versions = self.versions.read().unwrap();
-        Ok(versions.iter().map(|v| (v.identifier, *v)).collect())
+        Ok(versions.iter().map(|v| (v.identifier, v.clone())).collect())
     }
 
     #[pyo3(signature = (key, default=None))]
@@ -716,8 +728,8 @@ impl KnownRoomVersionsMapping {
         };
 
         let versions = self.versions.read().unwrap();
-        if let Some(version) = versions.iter().find(|v| v.identifier == key).copied() {
-            return Ok(Some(version.into_bound_py_any(py)?));
+        if let Some(version) = versions.iter().find(|v| v.identifier == key) {
+            return Ok(Some(version.clone().into_bound_py_any(py)?));
         }
 
         Ok(default)

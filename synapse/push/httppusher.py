@@ -512,7 +512,7 @@ class HttpPusher(Pusher):
                 content["membership"] = event.content["membership"]
                 content["user_is_target"] = event.state_key == self.user_id
             if self.hs.config.push.push_include_content and event.content:
-                content["content"] = event.content
+                content["content"] = dict(event.content)
 
             # We no longer send aliases separately, instead, we send the human
             # readable name of the room, which may be an alias.
