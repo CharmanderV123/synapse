@@ -588,7 +588,7 @@ def _event_type_from_format_version(
     if format_version == EventFormatVersions.ROOM_V1_V2:
         return FrozenEvent
     elif format_version == EventFormatVersions.ROOM_V3:
-        return FrozenEventV2
+        return Event
     elif format_version == EventFormatVersions.ROOM_V4_PLUS:
         return Event
     elif format_version == EventFormatVersions.ROOM_V11_HYDRA_PLUS:

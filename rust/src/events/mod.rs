@@ -651,11 +651,19 @@ impl Event {
 
         let internal_metadata = Py::new(py, EventInternalMetadata::new(internal_metadata_dict)?)?;
 
-        let event_value = serde_json::to_value(&event_format_enum)
-            .map_err(|err| PyException::new_err(format!("Failed to serialize event: {}", err)))?;
-        let event_id = calculate_event_id(&event_value, &room_version).map_err(|err| {
-            PyException::new_err(format!("Failed to calculate event_id: {}", err))
-        })?;
+        let event_id = {
+            if room_version.event_format == EventFormatVersions::ROOM_V1_V2 {
+                // Read the event ID From the event
+                todo!()
+            } else {
+                let event_value = serde_json::to_value(&event_format_enum).map_err(|err| {
+                    PyException::new_err(format!("Failed to serialize event: {}", err))
+                })?;
+                calculate_event_id(&event_value, &room_version).map_err(|err| {
+                    PyException::new_err(format!("Failed to calculate event_id: {}", err))
+                })?
+            }
+        };
 
         Ok(Self {
             inner: event_format_enum,
