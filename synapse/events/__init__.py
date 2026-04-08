@@ -592,7 +592,7 @@ def _event_type_from_format_version(
     elif format_version == EventFormatVersions.ROOM_V4_PLUS:
         return Event
     elif format_version == EventFormatVersions.ROOM_V11_HYDRA_PLUS:
-        return FrozenEventV4
+        return Event
     else:
         raise Exception("No event format %r" % (format_version,))
 

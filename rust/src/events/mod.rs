@@ -688,17 +688,37 @@ impl Event {
         py: Python<'py>,
         time_now: Option<i64>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        // TODO: We need to do a bunch of changes here.
-        match &self.inner {
-            EventFormatEnum::V2V3(format) => Ok(pythonize(py, format)?),
-            EventFormatEnum::V4(format) => Ok(pythonize(py, format)?),
-            // ...
+        let obj = self.get_dict(py)?;
+        let dict = obj.cast::<PyDict>()?;
+
+        // Get or create the unsigned dict
+        if let Ok(unsigned) = dict.get_item("unsigned") {
+            if let Some(unsigned) = unsigned {
+                let unsigned = unsigned.cast::<PyDict>()?;
+
+                if let Some(time_now) = time_now {
+                    if let Ok(Some(age_ts)) = unsigned.get_item("age_ts") {
+                        let age = time_now - age_ts.extract::<i64>()?;
+                        unsigned.set_item("age", age)?;
+                        unsigned.del_item("age_ts")?;
+                    }
+                }
+
+                // This may be a frozen event
+                unsigned.del_item("redacted_because").ok();
+            }
         }
+
+        Ok(obj)
     }
 
     fn get_templated_pdu_json<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        // Use get_dict but strip signatures, unsigned, and hashes — the
+        // joining/leaving/knocking server will re-sign and recalculate hashes.
         let obj = self.get_dict(py)?;
         let dict = obj.cast::<PyDict>()?;
+        dict.del_item("signatures").ok();
+        dict.del_item("unsigned").ok();
         dict.del_item("hashes").ok();
 
         Ok(obj)
@@ -829,7 +849,7 @@ impl Event {
     fn auth_event_ids(&self) -> PyResult<Vec<String>> {
         match &self.inner {
             EventFormatEnum::V2V3(format) => Ok(format.auth_event_ids()),
-            EventFormatEnum::V4(format) => Ok(format.auth_event_ids()),
+            EventFormatEnum::V4(format) => Ok(format.auth_event_ids()?),
             // ...
         }
     }
@@ -977,7 +997,7 @@ impl EventFormatV4Container {
                 bail!("room_id is required for event formats v3 and below");
             }
             if &*self.common_fields.type_ != "m.room.create"
-                && self.common_fields.state_key.as_deref() != Some("")
+                || self.common_fields.state_key.as_deref() != Some("")
             {
                 bail!("room_id is required for non-create events");
             }
@@ -993,7 +1013,9 @@ impl EventFormatV4Container {
 
         // Ensure that this is a create event, as all other events must
         // have a room ID.
-        if &*self.common_fields.type_ != "m.room.create" {
+        if &*self.common_fields.type_ != "m.room.create"
+            || self.common_fields.state_key.as_deref() != Some("")
+        {
             bail!("Event '{event_id}' has no room ID");
         }
 
@@ -1006,9 +1028,36 @@ impl EventFormatV4Container {
         Ok(room_id.into())
     }
 
-    fn auth_event_ids(&self) -> Vec<String> {
-        // TODO: Add create event
-        self.specific_fields.auth_events.clone()
+    fn auth_event_ids(&self) -> Result<Vec<String>, Error> {
+        let is_create = &*self.common_fields.type_ == "m.room.create"
+            && self.common_fields.state_key.as_deref() == Some("");
+
+        if is_create {
+            // The create event itself has no implicit auth events.
+            return Ok(self.specific_fields.auth_events.clone());
+        }
+
+        // For non-create events, the create event is implicitly part of
+        // the auth chain. Derive its event ID from the room ID by
+        // replacing the leading '!' with '$'.
+        let room_id = self
+            .specific_fields
+            .room_id
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("non-create event has no room_id"))?;
+
+        let mut create_event_id = String::with_capacity(room_id.len());
+        create_event_id.push('$');
+        create_event_id.push_str(&room_id[1..]);
+
+        debug_assert!(
+            !self.specific_fields.auth_events.contains(&create_event_id),
+            "create event ID should not already be in auth_events"
+        );
+
+        let mut auth_events = self.specific_fields.auth_events.clone();
+        auth_events.push(create_event_id);
+        Ok(auth_events)
     }
 }
 
