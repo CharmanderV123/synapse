@@ -99,14 +99,14 @@ impl PushRuleRoomFlag {
 pub struct RoomVersion {
     /// The identifier for this version.
     pub identifier: &'static str,
-    /// One of the RoomDisposition constants.
+    /// One of the [`RoomDisposition`] constants.
     pub disposition: &'static str,
-    /// One of the EventFormatVersions constants.
+    /// One of the [`EventFormatVersions`] constants.
     pub event_format: i32,
-    /// One of the StateResolutionVersions constants.
+    /// One of the [`StateResolutionVersions`] constants.
     pub state_res: i32,
     pub enforce_key_validity: bool,
-    /// Before MSC2432, m.room.aliases had special auth rules and redaction rules.
+    /// Before MSC2432, `m.room.aliases` had special auth rules and redaction rules.
     pub special_case_aliases_auth: bool,
     /// Strictly enforce canonicaljson, do not allow:
     /// * Integers outside the range of [-2^53 + 1, 2^53 - 1]
