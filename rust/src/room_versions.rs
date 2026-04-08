@@ -560,73 +560,28 @@ const ROOM_VERSION_V11: RoomVersion = RoomVersion {
 const ROOM_VERSION_MSC3757V11: RoomVersion = RoomVersion {
     identifier: "org.matrix.msc3757.11",
     disposition: RoomDisposition::UNSTABLE,
-    event_format: EventFormatVersions::ROOM_V4_PLUS,
-    state_res: StateResolutionVersions::V2,
-    enforce_key_validity: true,
-    special_case_aliases_auth: false,
-    strict_canonicaljson: true,
-    limit_notifications_power_levels: true,
-    implicit_room_creator: true,   // Used by MSC3820
-    updated_redaction_rules: true, // Used by MSC3820
-    restricted_join_rule: true,
-    restricted_join_rule_fix: true,
-    knock_join_rule: true,
-    msc3389_relation_redactions: false,
-    knock_restricted_join_rule: true,
-    enforce_int_power_levels: true,
-    msc3931_push_features: &[],
     msc3757_enabled: true,
-    msc4289_creator_power_enabled: false,
-    msc4291_room_ids_as_hashes: false,
-    strict_event_byte_limits_room_versions: true,
+    ..ROOM_VERSION_V11
 };
 
 const ROOM_VERSION_HYDRA_V11: RoomVersion = RoomVersion {
     identifier: "org.matrix.hydra.11",
     disposition: RoomDisposition::UNSTABLE,
     event_format: EventFormatVersions::ROOM_V11_HYDRA_PLUS,
-    state_res: StateResolutionVersions::V2_1, // Changed from v11
-    enforce_key_validity: true,
-    special_case_aliases_auth: false,
-    strict_canonicaljson: true,
-    limit_notifications_power_levels: true,
-    implicit_room_creator: true,   // Used by MSC3820
-    updated_redaction_rules: true, // Used by MSC3820
-    restricted_join_rule: true,
-    restricted_join_rule_fix: true,
-    knock_join_rule: true,
-    msc3389_relation_redactions: false,
-    knock_restricted_join_rule: true,
-    enforce_int_power_levels: true,
-    msc3931_push_features: &[],
-    msc3757_enabled: false,
-    msc4289_creator_power_enabled: true, // Changed from v11
-    msc4291_room_ids_as_hashes: true,    // Changed from v11
-    strict_event_byte_limits_room_versions: true,
+    state_res: StateResolutionVersions::V2_1,
+    msc4289_creator_power_enabled: true,
+    msc4291_room_ids_as_hashes: true,
+    ..ROOM_VERSION_V11
 };
 
 const ROOM_VERSION_V12: RoomVersion = RoomVersion {
     identifier: "12",
     disposition: RoomDisposition::STABLE,
     event_format: EventFormatVersions::ROOM_V11_HYDRA_PLUS,
-    state_res: StateResolutionVersions::V2_1, // Changed from v11
-    enforce_key_validity: true,
-    special_case_aliases_auth: false,
-    strict_canonicaljson: true,
-    limit_notifications_power_levels: true,
-    implicit_room_creator: true,   // Used by MSC3820
-    updated_redaction_rules: true, // Used by MSC3820
-    restricted_join_rule: true,
-    restricted_join_rule_fix: true,
-    knock_join_rule: true,
-    msc3389_relation_redactions: false,
-    knock_restricted_join_rule: true,
-    enforce_int_power_levels: true,
-    msc3931_push_features: &[],
-    msc3757_enabled: false,
-    msc4289_creator_power_enabled: true, // Changed from v11
-    msc4291_room_ids_as_hashes: true,    // Changed from v11
-    strict_event_byte_limits_room_versions: true,
+    state_res: StateResolutionVersions::V2_1,
+    msc4289_creator_power_enabled: true,
+    msc4291_room_ids_as_hashes: true,
+    ..ROOM_VERSION_V11
 };
 
 /// Helper class for managing the known room versions, and providing dict-like
