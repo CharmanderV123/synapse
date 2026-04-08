@@ -632,14 +632,14 @@ impl Event {
         let rejected_reason = rejected_reason.map(String::into_boxed_str);
 
         let event_format_enum = match room_version.event_format {
-            EventFormatVersions::ROOM_V3 => {
+            EventFormatVersions::ROOM_V3 | EventFormatVersions::ROOM_V4_PLUS => {
                 let event_format = depythonize(event_dict)?;
-                EventFormatEnum::V2(event_format)
+                EventFormatEnum::V2V3(event_format)
             }
-            EventFormatVersions::ROOM_V4_PLUS => {
-                let event_format: EventFormatV3Container = depythonize(event_dict)?;
+            EventFormatVersions::ROOM_V11_HYDRA_PLUS => {
+                let event_format: EventFormatV4Container = depythonize(event_dict)?;
                 event_format.validate(room_version)?;
-                EventFormatEnum::V3(event_format)
+                EventFormatEnum::V4(event_format)
             }
             _ => {
                 return Err(PyValueError::new_err(format!(
@@ -676,8 +676,8 @@ impl Event {
 
     fn get_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(pythonize(py, format)?),
-            EventFormatEnum::V3(format) => Ok(pythonize(py, format)?),
+            EventFormatEnum::V2V3(format) => Ok(pythonize(py, format)?),
+            EventFormatEnum::V4(format) => Ok(pythonize(py, format)?),
             // ...
         }
     }
@@ -690,8 +690,8 @@ impl Event {
     ) -> PyResult<Bound<'py, PyAny>> {
         // TODO: We need to do a bunch of changes here.
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(pythonize(py, format)?),
-            EventFormatEnum::V3(format) => Ok(pythonize(py, format)?),
+            EventFormatEnum::V2V3(format) => Ok(pythonize(py, format)?),
+            EventFormatEnum::V4(format) => Ok(pythonize(py, format)?),
             // ...
         }
     }
@@ -712,16 +712,16 @@ impl Event {
     #[getter]
     fn room_id(&self) -> PyResult<Cow<'_, str>> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(format.specific_fields.room_id.as_ref().into()),
-            EventFormatEnum::V3(format) => Ok(format.room_id(&self.event_id)?),
+            EventFormatEnum::V2V3(format) => Ok(format.specific_fields.room_id.as_ref().into()),
+            EventFormatEnum::V4(format) => Ok(format.room_id(&self.event_id)?),
         }
     }
 
     #[getter]
     fn signatures(&self) -> PyResult<Signatures> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(format.common_fields.signatures.clone()),
-            EventFormatEnum::V3(format) => Ok(format.common_fields.signatures.clone()),
+            EventFormatEnum::V2V3(format) => Ok(format.common_fields.signatures.clone()),
+            EventFormatEnum::V4(format) => Ok(format.common_fields.signatures.clone()),
             // ...
         }
     }
@@ -729,8 +729,8 @@ impl Event {
     #[getter]
     fn content(&self) -> PyResult<JsonObject> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(format.common_fields.content.clone()),
-            EventFormatEnum::V3(format) => Ok(format.common_fields.content.clone()),
+            EventFormatEnum::V2V3(format) => Ok(format.common_fields.content.clone()),
+            EventFormatEnum::V4(format) => Ok(format.common_fields.content.clone()),
             // ...
         }
     }
@@ -738,8 +738,8 @@ impl Event {
     #[getter]
     fn depth(&self) -> PyResult<i64> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(format.common_fields.depth),
-            EventFormatEnum::V3(format) => Ok(format.common_fields.depth),
+            EventFormatEnum::V2V3(format) => Ok(format.common_fields.depth),
+            EventFormatEnum::V4(format) => Ok(format.common_fields.depth),
             // ...
         }
     }
@@ -747,8 +747,8 @@ impl Event {
     #[getter]
     fn hashes(&self) -> PyResult<&HashMap<String, String>> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(&format.common_fields.hashes),
-            EventFormatEnum::V3(format) => Ok(&format.common_fields.hashes),
+            EventFormatEnum::V2V3(format) => Ok(&format.common_fields.hashes),
+            EventFormatEnum::V4(format) => Ok(&format.common_fields.hashes),
             // ...
         }
     }
@@ -756,8 +756,8 @@ impl Event {
     #[getter]
     fn origin_server_ts(&self) -> PyResult<i64> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(format.common_fields.origin_server_ts),
-            EventFormatEnum::V3(format) => Ok(format.common_fields.origin_server_ts),
+            EventFormatEnum::V2V3(format) => Ok(format.common_fields.origin_server_ts),
+            EventFormatEnum::V4(format) => Ok(format.common_fields.origin_server_ts),
             // ...
         }
     }
@@ -765,8 +765,8 @@ impl Event {
     #[getter]
     fn sender(&self) -> PyResult<&str> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(&format.common_fields.sender),
-            EventFormatEnum::V3(format) => Ok(&format.common_fields.sender),
+            EventFormatEnum::V2V3(format) => Ok(&format.common_fields.sender),
+            EventFormatEnum::V4(format) => Ok(&format.common_fields.sender),
             // ...
         }
     }
@@ -774,8 +774,8 @@ impl Event {
     #[getter(state_key)]
     fn state_key_attr(&self) -> PyResult<&str> {
         let state_key = match &self.inner {
-            EventFormatEnum::V2(format) => &format.common_fields.state_key,
-            EventFormatEnum::V3(format) => &format.common_fields.state_key,
+            EventFormatEnum::V2V3(format) => &format.common_fields.state_key,
+            EventFormatEnum::V4(format) => &format.common_fields.state_key,
             // ...
         };
 
@@ -788,8 +788,8 @@ impl Event {
     #[getter]
     fn r#type(&self) -> PyResult<&str> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(&format.common_fields.type_),
-            EventFormatEnum::V3(format) => Ok(&format.common_fields.type_),
+            EventFormatEnum::V2V3(format) => Ok(&format.common_fields.type_),
+            EventFormatEnum::V4(format) => Ok(&format.common_fields.type_),
             // ...
         }
     }
@@ -797,8 +797,8 @@ impl Event {
     #[getter]
     fn unsigned(&self) -> PyResult<JsonObjectMutable> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(format.common_fields.unsigned.clone()),
-            EventFormatEnum::V3(format) => Ok(format.common_fields.unsigned.clone()),
+            EventFormatEnum::V2V3(format) => Ok(format.common_fields.unsigned.clone()),
+            EventFormatEnum::V4(format) => Ok(format.common_fields.unsigned.clone()),
             // ...
         }
     }
@@ -820,16 +820,16 @@ impl Event {
 
     fn prev_event_ids(&self) -> PyResult<Vec<String>> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(format.specific_fields.prev_events.clone()),
-            EventFormatEnum::V3(format) => Ok(format.specific_fields.prev_events.clone()),
+            EventFormatEnum::V2V3(format) => Ok(format.specific_fields.prev_events.clone()),
+            EventFormatEnum::V4(format) => Ok(format.specific_fields.prev_events.clone()),
             // ...
         }
     }
 
     fn auth_event_ids(&self) -> PyResult<Vec<String>> {
         match &self.inner {
-            EventFormatEnum::V2(format) => Ok(format.auth_event_ids()),
-            EventFormatEnum::V3(format) => Ok(format.auth_event_ids()),
+            EventFormatEnum::V2V3(format) => Ok(format.auth_event_ids()),
+            EventFormatEnum::V4(format) => Ok(format.auth_event_ids()),
             // ...
         }
     }
@@ -844,8 +844,8 @@ impl Event {
     fn redacts<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         let value = if !self.room_version.updated_redaction_rules {
             let other_fields = match &self.inner {
-                EventFormatEnum::V2(format) => &format.common_fields.other_fields,
-                EventFormatEnum::V3(format) => &format.common_fields.other_fields,
+                EventFormatEnum::V2V3(format) => &format.common_fields.other_fields,
+                EventFormatEnum::V4(format) => &format.common_fields.other_fields,
                 // ...
             };
 
@@ -856,8 +856,8 @@ impl Event {
             value
         } else {
             let content = match &self.inner {
-                EventFormatEnum::V2(format) => &format.common_fields.content,
-                EventFormatEnum::V3(format) => &format.common_fields.content,
+                EventFormatEnum::V2V3(format) => &format.common_fields.content,
+                EventFormatEnum::V4(format) => &format.common_fields.content,
                 // ...
             };
 
@@ -873,16 +873,16 @@ impl Event {
 
     fn is_state(&self) -> bool {
         match &self.inner {
-            EventFormatEnum::V2(format) => format.common_fields.state_key.is_some(),
-            EventFormatEnum::V3(format) => format.common_fields.state_key.is_some(),
+            EventFormatEnum::V2V3(format) => format.common_fields.state_key.is_some(),
+            EventFormatEnum::V4(format) => format.common_fields.state_key.is_some(),
             // ...
         }
     }
 
     fn get_state_key(&self) -> Option<&str> {
         match &self.inner {
-            EventFormatEnum::V2(format) => format.common_fields.state_key.as_deref(),
-            EventFormatEnum::V3(format) => format.common_fields.state_key.as_deref(),
+            EventFormatEnum::V2V3(format) => format.common_fields.state_key.as_deref(),
+            EventFormatEnum::V4(format) => format.common_fields.state_key.as_deref(),
             // ...
         }
     }
@@ -928,52 +928,52 @@ impl Event {
 #[derive(Serialize)]
 #[serde(untagged)]
 enum EventFormatEnum {
-    V2(EventFormatV2Container),
-    V3(EventFormatV3Container),
+    V2V3(EventFormatV2V3Container),
+    V4(EventFormatV4Container),
     // ...
 }
 
 #[derive(Serialize, Deserialize)]
-struct EventFormatV2 {
+struct EventFormatV2V3 {
     auth_events: Vec<String>,
     prev_events: Vec<String>,
     room_id: Box<str>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct EventFormatV2Container {
+struct EventFormatV2V3Container {
     #[serde(flatten)]
-    specific_fields: EventFormatV2,
+    specific_fields: EventFormatV2V3,
     #[serde(flatten)]
     common_fields: EventCommonFields,
 }
 
-impl EventFormatV2Container {
+impl EventFormatV2V3Container {
     fn auth_event_ids(&self) -> Vec<String> {
         self.specific_fields.auth_events.clone()
     }
 }
 
 #[derive(Serialize, Deserialize)]
-struct EventFormatV3 {
+struct EventFormatV4 {
     auth_events: Vec<String>,
     prev_events: Vec<String>,
     room_id: Option<Box<str>>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct EventFormatV3Container {
+struct EventFormatV4Container {
     #[serde(flatten)]
-    specific_fields: EventFormatV3,
+    specific_fields: EventFormatV4,
     #[serde(flatten)]
     common_fields: EventCommonFields,
 }
 
-impl EventFormatV3Container {
+impl EventFormatV4Container {
     fn validate(&self, room_version: &RoomVersion) -> Result<(), Error> {
         if self.specific_fields.room_id.is_none() {
             // Only create events in event formats v4 plus can have a missing room_id.
-            if room_version.event_format != EventFormatVersions::ROOM_V4_PLUS {
+            if room_version.event_format != EventFormatVersions::ROOM_V11_HYDRA_PLUS {
                 bail!("room_id is required for event formats v3 and below");
             }
             if &*self.common_fields.type_ != "m.room.create"
@@ -1022,7 +1022,7 @@ mod tests {
         let json = r#"{"auth_events":[],"prev_events":[],"type":"m.room.create","sender":"@anon-20260225_142731-20:localhost:8800","content":{"room_version":"10","creator":"@anon-20260225_142731-20:localhost:8800"},"depth":1,"room_id":"!qVoJSympOqdUQRUfiC:localhost:8800","state_key":"","origin_server_ts":1772029657149,"hashes":{"sha256":"RIDkn4CrExGMOfRZlHl//1weAro5QC/q2D76YcyAUqk"},"signatures":{"localhost:8800":{"ed25519:a_GMSl":"GU7WmvI2Kd5kLrXKrWpRbUfEiVKGgH0sxQNEpBMMvgF3QhHN25AubVMmIClht5r/c+Iihb1xsq1j5Sw+RGfiDg"}},"unsigned":{"age_ts":1772029657149}}"#;
         let event_value: serde_json::Value = serde_json::from_str(json).unwrap();
 
-        let event: EventFormatV2Container = serde_json::from_str(json).unwrap();
+        let event: EventFormatV2V3Container = serde_json::from_str(json).unwrap();
         let parsed_value = serde_json::to_value(&event).unwrap();
 
         assert_eq!(&*event.common_fields.type_, "m.room.create");
@@ -1064,7 +1064,7 @@ mod tests {
         let json = r#"{"auth_events":[],"prev_events":[],"type":"m.room.create","sender":"@erikj:jki.re","content":{"room_version":"12","predecessor":{"room_id":"!VuNGkDTdbMOOxSmuDa:jki.re"}},"depth":1,"state_key":"","origin_server_ts":1775568141481,"hashes":{"sha256":"qBX+glsKvogXFrvsEN0eh13pO2kpuE6o/b4yREPtOqw"},"signatures":{"jki.re":{"ed25519:auto":"n/4gHQRagk3r1r24L/7a+oaMMf9cysVfQRYdjpDZcf4ppkVym33rhTW18Vy4zMa1L5nsWLkxsBvbrRRDYUOhBQ"}},"unsigned":{"age_ts":1775568141481}}"#;
         let event_value: serde_json::Value = serde_json::from_str(json).unwrap();
 
-        let event: EventFormatV3Container = serde_json::from_str(json).unwrap();
+        let event: EventFormatV4Container = serde_json::from_str(json).unwrap();
 
         let event_id = calculate_event_id(&event_value, &RoomVersion::V12).unwrap();
 
