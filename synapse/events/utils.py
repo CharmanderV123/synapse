@@ -47,7 +47,6 @@ from synapse.api.constants import (
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.logging.opentracing import SynapseTags, set_tag, trace
-from synapse.synapse_rust.events import Event
 from synapse.types import JsonDict, Requester
 
 from . import EventBase, FrozenEventV2, StrippedStateEvent, make_event_from_dict
@@ -526,7 +525,7 @@ def _serialize_event(
     """
 
     # FIXME(erikj): To handle the case of presence events and the like
-    if not isinstance(e, EventBase) and not isinstance(e, Event):
+    if not isinstance(e, EventBase):
         raise TypeError("Expected EventBase or Event, got %r" % (e,))
 
     time_now_ms = int(time_now_ms)
