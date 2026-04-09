@@ -49,17 +49,23 @@ if TYPE_CHECKING:
 
 
 def MockEvent(**kwargs: Any) -> EventBase:
-    if "event_id" not in kwargs:
-        kwargs["event_id"] = "fake_event_id"
-    if "type" not in kwargs:
-        kwargs["type"] = "fake_type"
-    if "content" not in kwargs:
-        kwargs["content"] = {}
-
     # Move internal metadata out so we can call make_event properly
     internal_metadata = kwargs.get("internal_metadata")
     if internal_metadata is not None:
         kwargs.pop("internal_metadata")
+
+    kwargs.setdefault("event_id", "$fake_event_id")
+    kwargs.setdefault("type", "fake_type")
+    kwargs.setdefault("auth_events", [])
+    kwargs.setdefault("prev_events", [])
+    kwargs.setdefault("content", {})
+    kwargs.setdefault("hashes", {})
+    kwargs.setdefault("signatures", {})
+    kwargs.setdefault("unsigned", {})
+    kwargs.setdefault("sender", "@fake_sender:domain")
+    kwargs.setdefault("room_id", "!fake_room_id")
+    kwargs.setdefault("depth", 0)
+    kwargs.setdefault("origin_server_ts", 0)
 
     return make_event_from_dict(kwargs, internal_metadata_dict=internal_metadata)
 

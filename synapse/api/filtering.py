@@ -38,6 +38,7 @@ from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase, relation_from_event
+from synapse.synapse_rust.events import Event
 from synapse.types import JsonDict, JsonMapping, RoomID, UserID
 
 if TYPE_CHECKING:
@@ -410,7 +411,7 @@ class Filter:
 
             # Check if the event has a relation.
             rel_type = None
-            if isinstance(event, EventBase):
+            if isinstance(event, EventBase) or isinstance(event, Event):
                 relation = relation_from_event(event)
                 if relation:
                     rel_type = relation.rel_type
@@ -493,7 +494,11 @@ class Filter:
         self, events: Collection[FilterEvent]
     ) -> list[FilterEvent]:
         # The event IDs to check, mypy doesn't understand the isinstance check.
-        event_ids = [event.event_id for event in events if isinstance(event, EventBase)]  # type: ignore[attr-defined]
+        event_ids = [
+            event.event_id
+            for event in events
+            if isinstance(event, EventBase) or isinstance(event, Event)
+        ]  # type: ignore[attr-defined]
         event_ids_to_keep = set(
             await self._store.events_have_relations(
                 event_ids, self.related_by_senders, self.related_by_rel_types
@@ -503,7 +508,8 @@ class Filter:
         return [
             event
             for event in events
-            if not isinstance(event, EventBase) or event.event_id in event_ids_to_keep
+            if not (isinstance(event, EventBase) or isinstance(event, Event))
+            or event.event_id in event_ids_to_keep
         ]
 
     async def filter(self, events: Iterable[FilterEvent]) -> list[FilterEvent]:

@@ -109,4 +109,5 @@ from synapse.synapse_rust.events import (  # noqa: E402
 Mapping.register(JsonObject)
 Mapping.register(Signatures)
 Mapping.register(DomainSignatures)
+Mapping.register(JsonObjectMutable)
 MutableMapping.register(JsonObjectMutable)
