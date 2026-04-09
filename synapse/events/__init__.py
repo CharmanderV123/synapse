@@ -64,9 +64,11 @@ def make_event_from_dict(
     rejected_reason: str | None = None,
 ) -> Event:
     """Construct an EventBase from the given event dict"""
-    event_type = Event(room_version.event_format)
-    return event_type(
-        event_dict, room_version, internal_metadata_dict or {}, rejected_reason
+    return Event(
+        event_dict=event_dict,
+        room_version=room_version,
+        internal_metadata_dict=internal_metadata_dict or {},
+        rejected_reason=rejected_reason,
     )
 
 

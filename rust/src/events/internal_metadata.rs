@@ -518,7 +518,7 @@ impl EventInternalMetadata {
         })
     }
 
-    fn copy(&self) -> PyResult<Self> {
+    pub fn copy(&self) -> PyResult<Self> {
         let guard = self.read_inner()?;
         Ok(EventInternalMetadata {
             inner: Arc::new(RwLock::new(guard.clone())),

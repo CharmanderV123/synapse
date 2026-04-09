@@ -40,6 +40,7 @@ use pythonize::{depythonize, pythonize};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    duration::SynapseDuration,
     events::{internal_metadata::EventInternalMetadata, utils::calculate_event_id},
     identifier::{EventID, IdentifierError},
     room_versions::{EventFormatVersions, RoomVersion},
@@ -152,10 +153,6 @@ impl JsonObject {
             Some(value) => Ok(pythonize(py, value)?),
             None => Ok(default.into_pyobject(py)?),
         }
-    }
-
-    fn as_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        Ok(pythonize(py, &self)?)
     }
 
     fn __eq__(&self, other: Bound<'_, PyMapping>) -> bool {
@@ -292,6 +289,15 @@ impl JsonObjectMutable {
         match obj.remove(key) {
             Some(value) => Ok(pythonize(py, &value)?),
             None => Ok(default.into_pyobject(py)?),
+        }
+    }
+
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self) -> Self {
+        let obj = self.object.read().unwrap();
+        Self {
+            object: Arc::new(RwLock::new(obj.clone())),
         }
     }
 }
@@ -455,6 +461,19 @@ impl Signatures {
         }
         Ok(())
     }
+
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self) -> Self {
+        let signatures = self.signatures.read().unwrap();
+        let new_signatures = signatures
+            .iter()
+            .map(|(k, v)| (k.clone(), v.deep_copy()))
+            .collect();
+        Self {
+            signatures: Arc::new(RwLock::new(new_signatures)),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -578,6 +597,15 @@ impl DomainSignatures {
         }
         Ok(())
     }
+
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self) -> Self {
+        let signatures = self.signatures.read().unwrap();
+        Self {
+            signatures: Arc::new(RwLock::new(signatures.clone())),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -598,6 +626,25 @@ struct EventCommonFields {
 
     #[serde(flatten)]
     other_fields: HashMap<Box<str>, serde_json::Value>,
+}
+
+impl EventCommonFields {
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self) -> Self {
+        Self {
+            content: self.content.clone(),
+            depth: self.depth,
+            hashes: self.hashes.clone(),
+            origin_server_ts: self.origin_server_ts,
+            sender: self.sender.clone(),
+            state_key: self.state_key.clone(),
+            type_: self.type_.clone(),
+            signatures: self.signatures.deep_copy(),
+            unsigned: self.unsigned.deep_copy(),
+            other_fields: self.other_fields.clone(),
+        }
+    }
 }
 
 #[pyclass(frozen, weakref)]
@@ -891,6 +938,68 @@ impl Event {
         let dict = dict.cast::<PyDict>()?;
         Ok(dict.keys())
     }
+
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self, py: Python<'_>) -> PyResult<Event> {
+        let internal_metadata = self.internal_metadata.bind(py).borrow().copy();
+
+        let new_event = Event {
+            inner: self.inner.deep_copy(),
+            event_id: self.event_id.clone(),
+            room_version: self.room_version,
+            rejected_reason: self.rejected_reason.clone(),
+            internal_metadata: Py::new(py, internal_metadata)?,
+        };
+        Ok(new_event)
+    }
+
+    // def sticky_duration(self) -> Duration | None:
+    //     """
+    //     Returns the effective sticky duration of this event, or None
+    //     if the event does not have a sticky duration.
+    //     (Sticky Events are a MSC4354 feature.)
+
+    //     Clamps the sticky duration to the maximum allowed duration.
+    //     """
+    //     sticky_obj = self.get_dict().get(StickyEvent.EVENT_FIELD_NAME, None)
+    //     if type(sticky_obj) is not dict:
+    //         return None
+    //     sticky_duration_ms = sticky_obj.get("duration_ms", None)
+    //     # MSC: Clamp to 0 and MAX_DURATION (1 hour)
+    //     # We use `type(...) is int` to avoid accepting bools as `isinstance(True, int)`
+    //     # (bool is a subclass of int)
+    //     if type(sticky_duration_ms) is int and sticky_duration_ms >= 0:
+    //         return min(
+    //             Duration(milliseconds=sticky_duration_ms),
+    //             StickyEvent.MAX_DURATION,
+    //         )
+    //     return None
+
+    fn sticky_duration(&self) -> Option<SynapseDuration> {
+        const MAX_DURATION_MS: u64 = 3600 * 1000;
+
+        let sticky_obj = self
+            .inner
+            .common_fields()
+            .other_fields
+            .get("org.matrix.msc4354.sticky");
+
+        let sticky_obj = match sticky_obj {
+            Some(serde_json::Value::Object(obj)) => obj,
+            _ => return None,
+        };
+
+        let duration_ms = match sticky_obj.get("duration_ms") {
+            Some(serde_json::Value::Number(num)) if num.is_u64() => num.as_u64().unwrap(),
+            _ => return None,
+        };
+
+        let duration_ms = std::cmp::min(duration_ms, MAX_DURATION_MS);
+
+        let duration = SynapseDuration::from_milliseconds(duration_ms);
+        Some(duration)
+    }
 }
 
 #[derive(Serialize)]
@@ -909,9 +1018,19 @@ impl EventFormatEnum {
             EventFormatEnum::V4(f) => &f.common_fields,
         }
     }
+
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self) -> Self {
+        match self {
+            EventFormatEnum::V1(f) => EventFormatEnum::V1(f.deep_copy()),
+            EventFormatEnum::V2V3(f) => EventFormatEnum::V2V3(f.deep_copy()),
+            EventFormatEnum::V4(f) => EventFormatEnum::V4(f.deep_copy()),
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct EventFormatV1 {
     auth_events: Vec<(String, HashMap<String, String>)>,
     prev_events: Vec<(String, HashMap<String, String>)>,
@@ -943,9 +1062,18 @@ impl EventFormatV1Container {
             .map(|(id, _)| id.clone())
             .collect()
     }
+
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self) -> Self {
+        Self {
+            specific_fields: self.specific_fields.clone(),
+            common_fields: self.common_fields.deep_copy(),
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct EventFormatV2V3 {
     auth_events: Vec<String>,
     prev_events: Vec<String>,
@@ -964,9 +1092,18 @@ impl EventFormatV2V3Container {
     fn auth_event_ids(&self) -> Vec<String> {
         self.specific_fields.auth_events.clone()
     }
+
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self) -> Self {
+        Self {
+            specific_fields: self.specific_fields.clone(),
+            common_fields: self.common_fields.deep_copy(),
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct EventFormatV4 {
     auth_events: Vec<String>,
     prev_events: Vec<String>,
@@ -1050,6 +1187,15 @@ impl EventFormatV4Container {
         let mut auth_events = self.specific_fields.auth_events.clone();
         auth_events.push(create_event_id);
         Ok(auth_events)
+    }
+
+    /// Returns a deep copy of this object, such that modifying the copy will
+    /// not affect the original.
+    fn deep_copy(&self) -> Self {
+        Self {
+            specific_fields: self.specific_fields.clone(),
+            common_fields: self.common_fields.deep_copy(),
+        }
     }
 }
 
