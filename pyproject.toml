@@ -267,7 +267,7 @@ dev = [
     "mypy",
     "mypy-zope",
     "types-bleach>=4.1.0",
-    "types-jsonschema>=3.2.0",
+    "types-jsonschema>=4.26.0.20260408",
     "types-netaddr>=0.8.0.6",
     "types-opentracing>=2.4.2",
     "types-Pillow>=8.3.4",
