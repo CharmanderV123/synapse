@@ -2,7 +2,7 @@
 //!
 //! Matrix event JSON utility functions.
 
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use anyhow::Context as _;
 use base64::Engine as _;
@@ -90,30 +90,31 @@ fn compute_event_reference_hash(
     Ok(base64_engine.encode(hash))
 }
 
-/// Attempts to redact the provided event, returning a copy of the redacted event if successful.
+/// Attempts to redact the provided event, returning a copy of the redacted
+/// event if successful.
 ///
 /// Events redacted with this function are meant to be sent over federation.
 pub fn redact(event: &Value, room_version: &RoomVersion) -> anyhow::Result<Value> {
     // TODO: add redacted because when needed
 
-    let mut allowed_keys = BTreeMap::from([
-        (EVENT_ID, ()),
-        (SENDER, ()),
-        (ROOM_ID, ()),
-        (HASHES, ()),
-        (SIGNATURES, ()),
-        (CONTENT, ()),
-        (TYPE, ()),
-        (STATE_KEY, ()),
-        (DEPTH, ()),
-        (PREV_EVENTS, ()),
-        (AUTH_EVENTS, ()),
-        (ORIGIN_SERVER_TS, ()),
+    let mut allowed_keys = BTreeSet::from([
+        (EVENT_ID),
+        (SENDER),
+        (ROOM_ID),
+        (HASHES),
+        (SIGNATURES),
+        (CONTENT),
+        (TYPE),
+        (STATE_KEY),
+        (DEPTH),
+        (PREV_EVENTS),
+        (AUTH_EVENTS),
+        (ORIGIN_SERVER_TS),
     ]);
 
     // Earlier room versions had additional allowed keys
     if !room_version.updated_redaction_rules {
-        allowed_keys.extend([(PREV_STATE, ()), (MEMBERSHIP, ()), (ORIGIN, ())]);
+        allowed_keys.extend([PREV_STATE, MEMBERSHIP, ORIGIN]);
     }
 
     let event_type = event
@@ -221,51 +222,33 @@ pub fn redact(event: &Value, room_version: &RoomVersion) -> anyhow::Result<Value
         .context("Event is not a JSON object")?
         .iter()
     {
-        if allowed_keys.contains_key(&k.as_str()) {
+        if allowed_keys.contains(&k.as_str()) {
             allowed_fields_mut.insert(k.clone(), v.clone());
         }
     }
 
     allowed_fields_mut.insert(CONTENT.to_string(), new_content);
 
-    Ok(allowed_fields)
-}
-
-/// Attempts to redact the provided event, returning a copy of the redacted event if successful.
-/// In order to conform to Synapse's internal redaction logic, this function allows keeping a few
-/// extra fields in the redacted event.
-///
-/// Events redacted with this function **should not** be sent over federation.
-pub fn redact_internal(event: &Value, room_version: &RoomVersion) -> anyhow::Result<Value> {
-    let mut redacted = redact(event, room_version)?;
-    let redacted_mut = redacted
-        .as_object_mut()
-        .context("Failed getting `redacted` as mutable object")?;
-
-    let mut new_unsigned = serde_json::json!({});
-    let new_unsigned_mut = new_unsigned
-        .as_object_mut()
-        .context("Failed getting `new_unsigned` as mutable object")?;
-
+    // Copy over known good unsigned keys
+    let allowed_unsigned_keys = [AGE_TS, REPLACES_STATE];
     if let Some(unsigned) = event.get(UNSIGNED) {
-        if let Some(age_ts) = unsigned.get(AGE_TS) {
-            new_unsigned_mut.insert(AGE_TS.to_string(), age_ts.clone());
+        let mut new_unsigned = serde_json::Map::new();
+        for key in allowed_unsigned_keys {
+            if let Some(value) = unsigned.get(key) {
+                new_unsigned.insert(key.to_string(), value.clone());
+            }
         }
-        if let Some(replaces_state) = unsigned.get(REPLACES_STATE) {
-            new_unsigned_mut.insert(REPLACES_STATE.to_string(), replaces_state.clone());
-        }
+        allowed_fields_mut.insert(UNSIGNED.to_string(), Value::Object(new_unsigned));
     }
 
-    redacted_mut.insert(UNSIGNED.to_string(), new_unsigned);
-
-    Ok(redacted)
+    Ok(allowed_fields)
 }
 
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
-    use super::{calculate_event_id, redact, redact_internal};
+    use super::{calculate_event_id, redact};
     use crate::{identifier::EventID, room_versions::RoomVersion};
 
     #[test]
@@ -587,65 +570,12 @@ mod tests {
                         "ed25519:a_phSE":"G8cfk/m97sndxMNrEZ2nMMSXkVeJE05G7if4JiVzAwGfD3TwnF/jfSHt2acWrpNqv/aEhZug3WLofc2id+rVBw"
                     }
                 },
-            }
-        );
-        let expected_internal = json!(
-            {
-                "auth_events":[
-                    "$gbHO7IPUHybc7ULFnT7P0r3iWlZFHGmr6zBfEYCUyKw",
-                    "$hy1eZFYcgNxMFNNBgCD5fyOzyWRcBkxfNcrUI5ZpZlE",
-                    "$Nt_z68EwFfPqBeHjzEHGsp461Z4EfNEzR-KH5bOYdOY"
-                ],
-                "prev_events":[
-                    "$4FbpZrgPQTwoLD9H5y7jcikucCypUOn78mXhQX7WliY"
-                ],
-                "type":"m.room.message",
-                "room_id":"!DHmIIVvxFASSFgDGzr:localhost:8008",
-                "sender":"@tester_b:localhost:8008",
-                "content":{},
-                "depth":24,
-                "origin":"localhost:8008",
-                "origin_server_ts":1731769874137_i64,
-                "hashes":{
-                    "sha256":"FoYV1w3TW/B2mVT0gX2/BZKpCwrrvGXqXFdUhN9LZYU"
-                },
-                "signatures":{
-                    "localhost:8008":{
-                        "ed25519:a_phSE":"G8cfk/m97sndxMNrEZ2nMMSXkVeJE05G7if4JiVzAwGfD3TwnF/jfSHt2acWrpNqv/aEhZug3WLofc2id+rVBw"
-                    }
-                },
                 "unsigned":{
                     "age_ts":1731769874137_i64
                 }
             }
         );
         let expected_v11 = json!(
-            {
-                "auth_events":[
-                    "$gbHO7IPUHybc7ULFnT7P0r3iWlZFHGmr6zBfEYCUyKw",
-                    "$hy1eZFYcgNxMFNNBgCD5fyOzyWRcBkxfNcrUI5ZpZlE",
-                    "$Nt_z68EwFfPqBeHjzEHGsp461Z4EfNEzR-KH5bOYdOY"
-                ],
-                "prev_events":[
-                    "$4FbpZrgPQTwoLD9H5y7jcikucCypUOn78mXhQX7WliY"
-                ],
-                "type":"m.room.message",
-                "room_id":"!DHmIIVvxFASSFgDGzr:localhost:8008",
-                "sender":"@tester_b:localhost:8008",
-                "content":{},
-                "depth":24,
-                "origin_server_ts":1731769874137_i64,
-                "hashes":{
-                    "sha256":"FoYV1w3TW/B2mVT0gX2/BZKpCwrrvGXqXFdUhN9LZYU"
-                },
-                "signatures":{
-                    "localhost:8008":{
-                        "ed25519:a_phSE":"G8cfk/m97sndxMNrEZ2nMMSXkVeJE05G7if4JiVzAwGfD3TwnF/jfSHt2acWrpNqv/aEhZug3WLofc2id+rVBw"
-                    }
-                },
-            }
-        );
-        let expected_internal_v11 = json!(
             {
                 "auth_events":[
                     "$gbHO7IPUHybc7ULFnT7P0r3iWlZFHGmr6zBfEYCUyKw",
@@ -676,21 +606,14 @@ mod tests {
         );
 
         let redacted = redact(&original, &RoomVersion::V10).unwrap();
-        let redacted_internal = redact_internal(&original, &RoomVersion::V10).unwrap();
 
         assert_eq!(expected, redacted);
-        assert_eq!(expected_internal, redacted_internal,);
 
         let versions = [RoomVersion::V11, RoomVersion::V12];
         for version in versions {
             let redacted = redact(&original, &version).unwrap();
-            let redacted_internal = redact_internal(&original, &version).unwrap();
 
             assert_eq!(expected_v11, redacted, "Room Version {version}");
-            assert_eq!(
-                expected_internal_v11, redacted_internal,
-                "Room Version {version}"
-            );
         }
     }
 

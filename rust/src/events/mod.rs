@@ -745,21 +745,19 @@ impl Event {
         let dict = obj.cast::<PyDict>()?;
 
         // Get or create the unsigned dict
-        if let Ok(unsigned) = dict.get_item("unsigned") {
-            if let Some(unsigned) = unsigned {
-                let unsigned = unsigned.cast::<PyDict>()?;
+        if let Ok(Some(unsigned)) = dict.get_item("unsigned") {
+            let unsigned = unsigned.cast::<PyDict>()?;
 
-                if let Some(time_now) = time_now {
-                    if let Ok(Some(age_ts)) = unsigned.get_item("age_ts") {
-                        let age = time_now - age_ts.extract::<i64>()?;
-                        unsigned.set_item("age", age)?;
-                        unsigned.del_item("age_ts")?;
-                    }
+            if let Some(time_now) = time_now {
+                if let Ok(Some(age_ts)) = unsigned.get_item("age_ts") {
+                    let age = time_now - age_ts.extract::<i64>()?;
+                    unsigned.set_item("age", age)?;
+                    unsigned.del_item("age_ts")?;
                 }
-
-                // This may be a frozen event
-                unsigned.del_item("redacted_because").ok();
             }
+
+            // This may be a frozen event
+            unsigned.del_item("redacted_because").ok();
         }
 
         Ok(obj)
