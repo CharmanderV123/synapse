@@ -41,7 +41,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     duration::SynapseDuration,
-    events::{internal_metadata::EventInternalMetadata, utils::calculate_event_id},
+    events::{
+        constants::event_field::{HASHES, SIGNATURES, UNSIGNED},
+        constants::unsigned_field::{AGE, AGE_TS, REDACTED_BECAUSE},
+        internal_metadata::EventInternalMetadata,
+        utils::calculate_event_id,
+    },
     identifier::{EventID, IdentifierError},
     room_versions::{EventFormatVersions, RoomVersion},
 };
@@ -745,19 +750,19 @@ impl Event {
         let dict = obj.cast::<PyDict>()?;
 
         // Get or create the unsigned dict
-        if let Ok(Some(unsigned)) = dict.get_item("unsigned") {
+        if let Ok(Some(unsigned)) = dict.get_item(UNSIGNED) {
             let unsigned = unsigned.cast::<PyDict>()?;
 
             if let Some(time_now) = time_now {
-                if let Ok(Some(age_ts)) = unsigned.get_item("age_ts") {
+                if let Ok(Some(age_ts)) = unsigned.get_item(AGE_TS) {
                     let age = time_now - age_ts.extract::<i64>()?;
-                    unsigned.set_item("age", age)?;
-                    unsigned.del_item("age_ts")?;
+                    unsigned.set_item(AGE, age)?;
+                    unsigned.del_item(AGE_TS)?;
                 }
             }
 
             // This may be a frozen event
-            unsigned.del_item("redacted_because").ok();
+            unsigned.del_item(REDACTED_BECAUSE).ok();
         }
 
         Ok(obj)
@@ -768,9 +773,9 @@ impl Event {
         // joining/leaving/knocking server will re-sign and recalculate hashes.
         let obj = self.get_dict(py)?;
         let dict = obj.cast::<PyDict>()?;
-        dict.del_item("signatures").ok();
-        dict.del_item("unsigned").ok();
-        dict.del_item("hashes").ok();
+        dict.del_item(SIGNATURES).ok();
+        dict.del_item(UNSIGNED).ok();
+        dict.del_item(HASHES).ok();
 
         Ok(obj)
     }

@@ -13,16 +13,18 @@ use signed_json::CanonicalizationOptions;
 use super::constants::{
     aliases_field, create_field,
     event_field::{
-        AGE_TS, AUTH_EVENTS, CONTENT, DEPTH, EVENT_ID, HASHES, MEMBERSHIP, ORIGIN,
-        ORIGIN_SERVER_TS, PREV_EVENTS, PREV_STATE, REPLACES_STATE, ROOM_ID, SENDER, SIGNATURES,
-        STATE_KEY, TYPE, UNSIGNED,
+        AUTH_EVENTS, CONTENT, DEPTH, EVENT_ID, HASHES, MEMBERSHIP, ORIGIN, ORIGIN_SERVER_TS,
+        PREV_EVENTS, PREV_STATE, REPLACES_STATE, ROOM_ID, SENDER, SIGNATURES, STATE_KEY, TYPE,
+        UNSIGNED,
     },
     event_type::{
         M_ROOM_ALIASES, M_ROOM_CREATE, M_ROOM_HISTORY_VISIBILITY, M_ROOM_JOIN_RULES, M_ROOM_MEMBER,
         M_ROOM_POWER_LEVELS, M_ROOM_REDACTION,
     },
     history_visibility_field, join_rules_field, membership_field, power_levels_field,
-    redaction_field, MAX_PDU_SIZE_BYTES,
+    redaction_field,
+    unsigned_field::AGE_TS,
+    MAX_PDU_SIZE_BYTES,
 };
 use crate::{
     identifier::{EventID, IdentifierError},

@@ -57,10 +57,17 @@ pub mod event_field {
     pub const PREV_STATE: &str = "prev_state";
     /// Event field: membership
     pub const MEMBERSHIP: &str = "membership";
-    /// Event field: age_ts
-    pub const AGE_TS: &str = "age_ts";
     /// Event field: replaces_state
     pub const REPLACES_STATE: &str = "replaces_state";
+}
+
+pub mod unsigned_field {
+    /// Unsigned field: age
+    pub const AGE: &str = "age";
+    /// Unsigned field: age_ts
+    pub const AGE_TS: &str = "age_ts";
+    /// Unsigned field: redacted_because
+    pub const REDACTED_BECAUSE: &str = "redacted_because";
 }
 
 /// Membership Event Fields
