@@ -703,7 +703,7 @@ impl Event {
             }
         };
 
-        let internal_metadata = Py::new(py, EventInternalMetadata::new(internal_metadata_dict)?)?;
+        let internal_metadata = EventInternalMetadata::new(internal_metadata_dict)?;
 
         let event_id = match &event_format_enum {
             EventFormatEnum::V1(format) => {
@@ -843,8 +843,8 @@ impl Event {
     }
 
     #[getter]
-    fn internal_metadata(&self, py: Python<'_>) -> PyResult<Py<EventInternalMetadata>> {
-        Ok(Py::clone_ref(&self.internal_metadata, py))
+    fn internal_metadata(&self) -> PyResult<EventInternalMetadata> {
+        Ok(self.internal_metadata.clone())
     }
 
     #[getter]
