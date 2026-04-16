@@ -656,7 +656,7 @@ impl EventCommonFields {
 struct Event {
     inner: EventFormatEnum,
     event_id: EventID,
-    internal_metadata: Py<EventInternalMetadata>,
+    internal_metadata: EventInternalMetadata,
     room_version: &'static RoomVersion,
     rejected_reason: Option<Box<str>>,
 }
@@ -944,15 +944,15 @@ impl Event {
 
     /// Returns a deep copy of this object, such that modifying the copy will
     /// not affect the original.
-    fn deep_copy(&self, py: Python<'_>) -> PyResult<Event> {
-        let internal_metadata = self.internal_metadata.bind(py).borrow().copy();
+    fn deep_copy(&self) -> PyResult<Event> {
+        let internal_metadata = self.internal_metadata.deep_copy()?;
 
         let new_event = Event {
             inner: self.inner.deep_copy(),
             event_id: self.event_id.clone(),
             room_version: self.room_version,
             rejected_reason: self.rejected_reason.clone(),
-            internal_metadata: Py::new(py, internal_metadata)?,
+            internal_metadata,
         };
         Ok(new_event)
     }
