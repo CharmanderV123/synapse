@@ -34,7 +34,7 @@ use pyo3::{
         PyAnyMethods, PyDict, PyDictMethods, PyIterator, PyList, PyMapping, PyMappingMethods,
         PyModule, PyModuleMethods,
     },
-    wrap_pyfunction, Bound, IntoPyObject, Py, PyAny, PyResult, Python,
+    wrap_pyfunction, Bound, IntoPyObject, PyAny, PyResult, Python,
 };
 use pythonize::{depythonize, pythonize};
 use serde::{Deserialize, Serialize};
@@ -665,7 +665,6 @@ struct Event {
 impl Event {
     #[new]
     fn new_from_py<'a, 'py>(
-        py: Python<'py>,
         event_dict: &'a Bound<'py, PyAny>,
         room_version: &'a Bound<'py, PyAny>,
         internal_metadata_dict: &'a Bound<'py, PyDict>,
