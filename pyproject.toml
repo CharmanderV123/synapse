@@ -138,7 +138,7 @@ saml2 = [
     "pytz>=2018.3",  # via pysaml2
 ]
 oidc = ["authlib>=1.6.11"]
-url-preview = ["lxml>=4.6.3"]
+url-preview = ["lxml>=6.1.0"]
 sentry = ["sentry-sdk>=0.7.2"]
 opentracing = [
     "jaeger-client>=4.2.0",
@@ -181,7 +181,7 @@ all = [
     # oidc and jwt
     "authlib>=1.6.11",
     # url-preview
-    "lxml>=4.6.3",
+    "lxml>=6.1.0",
     # sentry
     "sentry-sdk>=0.7.2",
     # opentracing
