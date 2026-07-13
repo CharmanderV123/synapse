@@ -58,7 +58,7 @@ dependencies = [
     # 2.0.5 updates collections.abc imports to avoid Python 3.10 incompatibility.
     "sortedcontainers>=2.0.5",
     "pymacaroons>=0.13.0",
-    "msgpack>=0.5.2",
+    "msgpack>=1.2.1",
     "phonenumbers>=8.2.0",
     # we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
     # `prometheus_client.metrics` was added in 0.5.0, so we require that too.
