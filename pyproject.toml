@@ -73,7 +73,7 @@ dependencies = [
     # add a lower bound to the Jinja2 dependency.
     "Jinja2>=3.0",
     # 3.2.0 updates collections.abc imports to avoid Python 3.10 incompatibility.
-    "bleach>=3.2.0",
+    "bleach>=6.4.0",
     # pydantic 2.12 depends on typing-extensions>=4.14.1
     "typing-extensions>=4.14.1",
     # We enforce that we have a `cryptography` version that bundles an `openssl`
