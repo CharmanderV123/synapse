@@ -53,7 +53,7 @@ dependencies = [
     "bcrypt>=3.1.7",
     # 10.0.1 minimum is mandatory here because of libwebp CVE-2023-4863.
     # Packagers that already took care of libwebp can lower that down to 5.4.0.
-    "Pillow>=10.0.1",
+    "Pillow>=12.3.0",
     # We use SortedDict.peekitem(), which was added in sortedcontainers 1.5.2.
     # 2.0.5 updates collections.abc imports to avoid Python 3.10 incompatibility.
     "sortedcontainers>=2.0.5",
