@@ -148,7 +148,7 @@ opentracing = [
     # These dependencies aren't directly required by Synapse.
     # However, in order for Synapse to build, Synapse requires a higher minimum version
     # for these dependencies than the minimum specified by the direct dependency.
-    "thrift>=0.10",  # via jaeger-client
+    "thrift>=0.24.0",  # via jaeger-client
     "tornado>=6.0",  # via jaeger-client
 ]
 jwt = ["authlib"]
@@ -200,7 +200,7 @@ all = [
     # for these dependencies than the minimum specified by the direct dependency.
     "defusedxml>=0.7.1", # via pysaml2
     "pytz>=2018.3",  # via pysaml2
-    "thrift>=0.10",  # via jaeger-client
+    "thrift>=0.24.0",  # via jaeger-client
     "tornado>=6.0",  # via jaeger-client
 ]
 
