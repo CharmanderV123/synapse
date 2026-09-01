@@ -149,7 +149,7 @@ opentracing = [
     # However, in order for Synapse to build, Synapse requires a higher minimum version
     # for these dependencies than the minimum specified by the direct dependency.
     "thrift>=0.10",  # via jaeger-client
-    "tornado>=6.0",  # via jaeger-client
+    "tornado>=6.5.8",  # via jaeger-client
 ]
 jwt = ["authlib"]
 # hiredis is not a *strict* dependency, but it makes things much faster.
@@ -201,7 +201,7 @@ all = [
     "defusedxml>=0.7.1", # via pysaml2
     "pytz>=2018.3",  # via pysaml2
     "thrift>=0.10",  # via jaeger-client
-    "tornado>=6.0",  # via jaeger-client
+    "tornado>=6.5.8",  # via jaeger-client
 ]
 
 [project.urls]
