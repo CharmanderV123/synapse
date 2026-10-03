@@ -111,7 +111,7 @@ dependencies = [
     "pyparsing>=2.4",  # via packaging
     "pyrsistent>=0.18.0",  # via jsonschema
     "requests>=2.16.0", # 2.16.0+ no longer vendors urllib3, avoiding Python 3.10+ incompatibility
-    "urllib3>=1.26.5", # via treq; 1.26.5 fixes Python 3.10+ collections.abc compatibility
+    "urllib3>=2.8.0", # via treq; 1.26.5 fixes Python 3.10+ collections.abc compatibility
     # 5.2 is the current version in Debian oldstable. If we don't care to support that, then 5.4 is
     # the minimum version from Ubuntu 22.04 and RHEL 9. (as of 2025-12)
     # When bumping this version to 6.2 or above, refer to https://github.com/element-hq/synapse/pull/19274
